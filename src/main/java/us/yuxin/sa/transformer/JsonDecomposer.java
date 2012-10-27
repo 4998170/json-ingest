@@ -105,4 +105,20 @@ public class JsonDecomposer {
     lastRowKey = String.format("%s.%04d%04d",
       timeFmt.print(ots), oid % 10000, ser % 10000).getBytes();
   }
+
+
+  public void start() {
+    if (transformer != null)
+      transformer.start();
+  }
+
+
+  public void stop() {
+    if (transformer != null)
+      transformer.stop();
+  }
+
+  public byte[] getRowKey() {
+    return lastRowKey;
+  }
 }
