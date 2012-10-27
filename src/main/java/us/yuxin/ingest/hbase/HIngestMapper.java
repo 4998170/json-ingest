@@ -4,7 +4,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.base.Splitter;
 import org.apache.hadoop.conf.Configuration;
@@ -18,62 +17,24 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reporter;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.msgpack.MessagePack;
 import org.msgpack.packer.Packer;
+import us.yuxin.sa.transformer.JsonDecomposer;
+import us.yuxin.sa.transformer.Transformer;
+import us.yuxin.sa.transformer.TransformerFactory;
 
 
 public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, NullWritable> {
-  ObjectMapper mapper;
+
+  JsonDecomposer decomposer;
   protected MessagePack messagePack;
 
-  protected DateTimeFormatter timeFmt;
-
-  protected AtomicInteger serial;
-  protected AtomicInteger oidSerial;
-
   protected boolean storeAttirbute;
+  protected boolean storeMsgpack;
 
   protected JobConf job;
   protected Configuration hbase;
   protected HTable hTable;
-
-  protected byte[] createRowId(Map<String, Object> data) {
-    Long ots = null;
-    Object ov;
-
-    ov = data.get("logTimestamp");
-    if (ov == null) {
-      //return new Text("9999");
-      return null;
-    }
-
-    if (ov instanceof Long) {
-      ots = (Long) ov;
-    } else if (ov instanceof Integer) {
-      // logger.warn("Invalid logTimestamp(int) - raw-log:" + new String(event.getBody()));
-      ots = ((Integer) ov).longValue();
-    } else if (ov instanceof String) {
-      // logger.warn("Invalid logTimestamp(string) - raw-log:" + new String(event.getBody()));
-      ots = Long.parseLong((String) ov);
-    }
-
-    if (ots == null) {
-      // logger.warn("Invalid logTimestamp(empty) - raw-log:" + new String(event.getBody()));
-      // return new Text("9999");
-      return null;
-    }
-
-    Integer oid = (Integer) data.get("oid");
-    if (oid == null)
-      oid = oidSerial.incrementAndGet();
-
-    Integer ser = serial.incrementAndGet();
-    return String.format("%s.%04d%04d",
-      timeFmt.print(ots), oid % 10000, ser % 10000).getBytes();
-  }
 
 
   protected void createConnection() throws IOException {
@@ -121,15 +82,23 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
   @Override
   public void configure(JobConf conf) {
     this.job = conf;
-
-    mapper = new ObjectMapper();
-    messagePack = new MessagePack();
-
-    timeFmt = DateTimeFormat.forPattern("YYYYMMddHHmmssSSS");
-    oidSerial = new AtomicInteger(0);
-    serial = new AtomicInteger(0);
-
     storeAttirbute = conf.getBoolean(HIngest.CONF_INGEST_STORE_ATTR, false);
+    storeMsgpack = conf.getBoolean(HIngest.CONF_INGEST_STORE_MSGPACK, true);
+
+    Transformer transformer = null;
+    try {
+      transformer = TransformerFactory.get((String) job.get(HIngest.CONF_INGEST_TRANSFORMER));
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    decomposer = new JsonDecomposer(transformer);
+    decomposer.start();
+
+    if (storeMsgpack) {
+      messagePack = new MessagePack();
+    }
+
 
     try {
       createConnection();
@@ -151,9 +120,9 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
 
     // System.out.println("VALUE:" + value + ", bytes[]:" + raw + ", length:" + raw.length);
     try {
-      Map<String, Object> msg = mapper.readValue(raw, Map.class);
+      Map<String, Object> msg = decomposer.readValue(raw);
 
-      byte[] rowId = createRowId(msg);
+      byte[] rowId = decomposer.getRowKey();
       if (rowId == null) {
         // TODO ... Error Handler
         return;
@@ -164,15 +133,17 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
 
       put.add("raw".getBytes(), new byte[0], raw);
 
-      ByteArrayOutputStream bos = new ByteArrayOutputStream();
-      Packer packer = messagePack.createPacker(bos);
-      try {
-        packer.write(msg);
-        put.add("mp".getBytes(), new byte[0], bos.toByteArray());
-        bos.close();
-      } catch (IOException e) {
-        e.printStackTrace();
-        // TODO ... Error Handler
+      if (storeMsgpack) {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        Packer packer = messagePack.createPacker(bos);
+        try {
+          packer.write(msg);
+          put.add("mp".getBytes(), new byte[0], bos.toByteArray());
+          bos.close();
+        } catch (IOException e) {
+          e.printStackTrace();
+          // TODO ... Error Handler
+        }
       }
 
       if (storeAttirbute) {
@@ -201,6 +172,7 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
 
   @Override
   public void close() throws IOException {
+    decomposer.stop();
     closeConnection();
   }
 }

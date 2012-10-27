@@ -23,9 +23,11 @@ public class HIngest extends Configured implements Tool {
   public final static String CONF_HBASE_CONNECT_TOKEN = "ingest.hbase.token";
   public final static String CONF_HBASE_JAR_PATH = "ingest.hbase.jar.path";
   public final static String CONF_INGEST_STORE_ATTR = "ingest.store.attr";
+  public final static String CONF_INGEST_STORE_MSGPACK = "ingest.store.msgpack";
+  public final static String CONF_INGEST_TRANSFORMER = "ingest.transformer";
+
 
   protected void prepareClassPath(Configuration conf) throws IOException {
-
     FileSystem fs = FileSystem.get(conf);
 
     FileStatus[] fileStatuses = fs.listStatus(new Path(conf.get(CONF_HBASE_JAR_PATH, "/is/app/ingest/hbase/lib")));
