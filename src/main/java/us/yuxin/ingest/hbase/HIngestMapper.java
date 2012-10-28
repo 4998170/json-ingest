@@ -17,6 +17,7 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reporter;
+import org.codehaus.jackson.JsonParseException;
 import org.msgpack.MessagePack;
 import org.msgpack.packer.Packer;
 import us.yuxin.ingest.Ingest;
@@ -117,7 +118,11 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
       return;
 
     String text = value.toString();
-    byte[] raw = text.getBytes();
+    byte[] raw = text.getBytes("UTF-8");
+
+    System.out.println(" " + value.getLength() + ", "
+      + value.getBytes().length + ", "
+      + text.length() + ", " + raw.length);
 
     // System.out.println("VALUE:" + value + ", bytes[]:" + raw + ", length:" + raw.length);
     try {
@@ -164,6 +169,9 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
         }
         hTable.put(put);
       }
+    } catch (JsonParseException e) {
+      System.out.println("ERROR-MSG:" + new String(raw));
+      e.printStackTrace();
     } catch (Exception e) {
       e.printStackTrace();
       // TODO ... Error Handler
