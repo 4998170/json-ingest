@@ -37,7 +37,8 @@ tsadd = 3600 * 6
 splits = Array.new
 
 while tsbegin < tsend do
-	splits << hex(tsbegin.strftime("%Y%m%d%H%M")).to_java_bytes
+	#splits << hex(tsbegin.strftime("%Y%m%d%H%M")).to_java_bytes
+	splits << tsbegin.strftime("%Y%m%d%H%M").to_java_bytes
 	tsbegin += tsadd
 end
 
