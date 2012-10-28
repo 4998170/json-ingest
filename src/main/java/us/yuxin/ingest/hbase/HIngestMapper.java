@@ -19,6 +19,7 @@ import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reporter;
 import org.msgpack.MessagePack;
 import org.msgpack.packer.Packer;
+import us.yuxin.ingest.Ingest;
 import us.yuxin.sa.transformer.JsonDecomposer;
 import us.yuxin.sa.transformer.Transformer;
 import us.yuxin.sa.transformer.TransformerFactory;
@@ -82,12 +83,12 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
   @Override
   public void configure(JobConf conf) {
     this.job = conf;
-    storeAttirbute = conf.getBoolean(HIngest.CONF_INGEST_STORE_ATTR, false);
-    storeMsgpack = conf.getBoolean(HIngest.CONF_INGEST_STORE_MSGPACK, true);
+    storeAttirbute = conf.getBoolean(Ingest.CONF_INGEST_STORE_ATTR, false);
+    storeMsgpack = conf.getBoolean(Ingest.CONF_INGEST_STORE_MSGPACK, true);
 
     Transformer transformer = null;
     try {
-      transformer = TransformerFactory.get((String) job.get(HIngest.CONF_INGEST_TRANSFORMER));
+      transformer = TransformerFactory.get((String) job.get(Ingest.CONF_INGEST_TRANSFORMER));
     } catch (Exception e) {
       e.printStackTrace();
     }
