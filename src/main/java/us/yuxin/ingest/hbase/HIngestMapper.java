@@ -118,13 +118,8 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
       return;
 
     String text = value.toString();
-    byte[] raw = text.getBytes("UTF-8");
+    byte[] raw = text.getBytes("utf-8");
 
-    System.out.println(" " + value.getLength() + ", "
-      + value.getBytes().length + ", "
-      + text.length() + ", " + raw.length);
-
-    // System.out.println("VALUE:" + value + ", bytes[]:" + raw + ", length:" + raw.length);
     try {
       Map<String, Object> msg = decomposer.readValue(raw);
 
@@ -173,6 +168,7 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
       System.out.println("ERROR-MSG:" + new String(raw));
       e.printStackTrace();
     } catch (Exception e) {
+      System.err.println("ERR-MSG:" + new String(raw));
       e.printStackTrace();
       // TODO ... Error Handler
     }
