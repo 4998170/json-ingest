@@ -5,7 +5,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.base.Splitter;
 import org.apache.accumulo.core.client.AccumuloException;
@@ -25,19 +24,16 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reporter;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.msgpack.MessagePack;
 import org.msgpack.packer.Packer;
+import us.yuxin.ingest.Ingest;
+import us.yuxin.sa.transformer.JsonDecomposer;
+import us.yuxin.sa.transformer.Transformer;
+import us.yuxin.sa.transformer.TransformerFactory;
 
 public class AIngestMapper implements Mapper<LongWritable, Text, NullWritable, NullWritable> {
-  protected ObjectMapper mapper;
+  protected JsonDecomposer decomposer;
   protected MessagePack messagePack;
-
-  protected DateTimeFormatter timeFmt;
-  protected AtomicInteger serial;
-  protected AtomicInteger oidSerial;
 
   protected ColumnVisibility columnVisbility;
 
@@ -46,42 +42,9 @@ public class AIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
   protected BatchWriter writer;
 
   protected boolean storeAttirbute;
+  protected boolean storeMsgpack;
+
   JobConf job;
-
-  protected Text createRowId(Map<String, Object> data) {
-    Long ots = null;
-    Object ov;
-
-    ov = data.get("logTimestamp");
-    if (ov == null) {
-      //return new Text("9999");
-      return null;
-    }
-
-    if (ov instanceof Long) {
-      ots = (Long) ov;
-    } else if (ov instanceof Integer) {
-      // logger.warn("Invalid logTimestamp(int) - raw-log:" + new String(event.getBody()));
-      ots = ((Integer) ov).longValue();
-    } else if (ov instanceof String) {
-      // logger.warn("Invalid logTimestamp(string) - raw-log:" + new String(event.getBody()));
-      ots = Long.parseLong((String) ov);
-    }
-
-    if (ots == null) {
-      // logger.warn("Invalid logTimestamp(empty) - raw-log:" + new String(event.getBody()));
-      // return new Text("9999");
-      return null;
-    }
-
-    Integer oid = (Integer) data.get("oid");
-    if (oid == null)
-      oid = oidSerial.incrementAndGet();
-
-    Integer ser = serial.incrementAndGet();
-    return new Text(String.format("%s.%04d%04d",
-      timeFmt.print(ots), oid % 10000, ser % 10000));
-  }
 
 
   protected void createConnection()
@@ -128,14 +91,21 @@ public class AIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
   public void configure(JobConf conf) {
     this.job = conf;
 
-    mapper = new ObjectMapper();
-    messagePack = new MessagePack();
+    storeAttirbute = conf.getBoolean(Ingest.CONF_INGEST_STORE_ATTR, false);
+    storeMsgpack = conf.getBoolean(Ingest.CONF_INGEST_STORE_MSGPACK, true);
 
-    timeFmt = DateTimeFormat.forPattern("YYYYMMddHHmmssSSS");
-    oidSerial = new AtomicInteger(0);
-    serial = new AtomicInteger(0);
+    if (storeMsgpack)
+      messagePack = new MessagePack();
 
-    storeAttirbute = conf.getBoolean(AIngest.CONF_INGEST_STORE_ATTR, false);
+    Transformer transformer = null;
+    try {
+      transformer = TransformerFactory.get(job.get(Ingest.CONF_INGEST_TRANSFORMER));
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+
+    decomposer = new JsonDecomposer(transformer);
+    decomposer.start();
   }
 
 
@@ -152,8 +122,8 @@ public class AIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
         createConnection();
       }
 
-      Map<String, Object> msg = mapper.readValue(raw, Map.class);
-      Text rowId = createRowId(msg);
+      Map<String, Object> msg = decomposer.readValue(raw);
+      Text rowId = new Text(decomposer.getRowKey());
 
       // System.out.println("rowId:" + rowId.toString());
       if (rowId == null) {
@@ -165,14 +135,16 @@ public class AIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
       mutation.put(new Text("raw"), new Text(value), columnVisbility, new Value(new byte[0]));
 
 
-      ByteArrayOutputStream bos = new ByteArrayOutputStream();
-      Packer packer = messagePack.createPacker(bos);
-      try {
-        packer.write(msg);
-        mutation.put(new Text("mp"), new Text(bos.toByteArray()), columnVisbility, new Value(new byte[0]));
-        bos.close();
-      } catch (IOException e) {
-        // TODO ... Error Handler
+      if (storeMsgpack) {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        Packer packer = messagePack.createPacker(bos);
+        try {
+          packer.write(msg);
+          mutation.put(new Text("mp"), new Text(bos.toByteArray()), columnVisbility, new Value(new byte[0]));
+          bos.close();
+        } catch (IOException e) {
+          // TODO ... Error Handler
+        }
       }
 
 

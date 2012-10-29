@@ -17,43 +17,26 @@ import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hadoop.mapred.lib.NullOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import us.yuxin.ingest.Ingest;
 
-public class AIngest extends Configured implements Tool {
+public class AIngest extends Ingest {
   public final static String CONF_ACCULUMO_CONNECTION_TOKEN = "ingest.accumulo.token";
   public final static String CONF_ACCULUMO_MAX_MEMORY = "ingest.accumulo.max.memory";
   public final static String CONF_ACCUMULO_MAX_LATENCY = "ingest.accumulo.max.latency";
   public final static String CONF_ACCUMULO_MAX_WRITE_THREADS = "ingest.accumulo.max.write.threads";
   public final static String CONF_ACCUMULO_JAR_PATH = "ingest.accumlo.jar.path";
-  public final static String CONF_INGEST_STORE_ATTR = "ingest.store.attr";
-//  public final static String CONF_INGEST_MAX_MAP_TASKS = "ingest.max.map.tasks";
+
 
   protected final static int ACCUMULO_MAX_MEMORY = 1024000;
   protected final static int ACCUMULO_MAX_LATENCY = 1000;
   protected final static int ACCUMULO_MAX_WRITE_THREADS = 2;
 
-  protected final static int MAPRED_TASKTRACKER_MAP_TASKS_MAX = 2;
-//  protected final static int INGEST_MAX_MAP_TASKS = 20;
-
-  protected void prepareClassPath(Configuration conf) throws IOException {
-
-    FileSystem fs = FileSystem.get(conf);
-
-    FileStatus[] fileStatuses = fs.listStatus(
-      new Path(conf.get(CONF_ACCUMULO_JAR_PATH, "/is/app/ingest/accumulo/lib")));
-
-    for (FileStatus fileStatus : fileStatuses) {
-      if (fileStatus.getPath().toString().endsWith(".jar")) {
-        DistributedCache.addArchiveToClassPath(fileStatus.getPath(), conf, fs);
-      }
-    }
-    fs.close();
-  }
 
 
   @Override
   public int run(String[] args) throws Exception {
     Configuration conf = getConf();
-    prepareClassPath(conf);
+    prepareClassPath(CONF_ACCUMULO_JAR_PATH, "/is/app/ingest/accumulo/lib");
 
     JobConf job = new JobConf(conf);
 
@@ -74,8 +57,6 @@ public class AIngest extends Configured implements Tool {
   protected static Configuration prepareConfiguration() {
     Configuration conf = new Configuration();
 
-    conf.setInt("mapred.tasktracker.map.tasks.maximum",
-      MAPRED_TASKTRACKER_MAP_TASKS_MAX);
     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     if (classLoader == null) {
       classLoader = AIngest.class.getClassLoader();
