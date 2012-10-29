@@ -1,6 +1,7 @@
 package us.yuxin.examples.hbase;
 
 import java.io.IOException;
+import java.util.Date;
 import java.util.Iterator;
 
 import com.google.common.base.Splitter;
@@ -36,6 +37,7 @@ public class HBaseScanner {
 
     Scan scan = new Scan();
     scan.setBatch(20);
+    scan.setCaching(1000);
     scan.setMaxVersions(1);
     scan.setStartRow(args[1].getBytes());
     scan.setStopRow(args[2].getBytes());
@@ -46,7 +48,7 @@ public class HBaseScanner {
     for (Result r: rs) {
       c += 1;
       if (c % 1000 == 0) {
-        System.out.println("" + c + " Reached...");
+        System.out.println("" + c + " Reached... " + new Date().toString());
       }
     }
 
