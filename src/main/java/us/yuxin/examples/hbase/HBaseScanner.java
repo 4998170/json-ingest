@@ -47,7 +47,7 @@ public class HBaseScanner {
     int c = 0;
     for (Result r: rs) {
       c += 1;
-      if (c % 1000 == 0) {
+      if (c % 5000 == 0) {
         System.out.println("" + c + " Reached... " + new Date().toString());
       }
     }
