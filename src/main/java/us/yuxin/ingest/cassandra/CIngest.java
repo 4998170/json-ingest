@@ -17,33 +17,17 @@ import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hadoop.mapred.lib.NullOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import us.yuxin.ingest.Ingest;
 
-public class CIngest extends Configured implements Tool {
+public class CIngest extends Ingest {
   public final static String CONF_CASSANDRA_CONNECT_TOKEN = "ingest.cassandra.token";
   public final static String CONF_CASSANDRA_JAR_PATH = "ingest.cassandra.jar.path";
-  public final static String CONF_INGEST_STORE_ATTR = "ingest.store.attr";
-
-
-  protected void prepareClassPath(Configuration conf) throws IOException {
-
-    FileSystem fs = FileSystem.get(conf);
-
-    FileStatus[] fileStatuses = fs.listStatus(
-      new Path(conf.get(CONF_CASSANDRA_JAR_PATH, "/is/app/ingest/cassandra/lib")));
-
-    for (FileStatus fileStatus : fileStatuses) {
-      if (fileStatus.getPath().toString().endsWith(".jar")) {
-        DistributedCache.addArchiveToClassPath(fileStatus.getPath(), conf, fs);
-      }
-    }
-    fs.close();
-  }
 
 
   @Override
   public int run(String[] args) throws Exception {
     Configuration conf = getConf();
-    prepareClassPath(conf);
+    prepareClassPath(CONF_CASSANDRA_JAR_PATH, "/is/app/ingest/cassandra/lib");
 
     JobConf job = new JobConf(conf);
 

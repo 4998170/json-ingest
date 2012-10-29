@@ -3,7 +3,6 @@ package us.yuxin.ingest.cassandra;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.google.common.base.Splitter;
 import com.netflix.astyanax.AstyanaxContext;
@@ -26,40 +25,43 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Mapper;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reporter;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.msgpack.MessagePack;
+import us.yuxin.ingest.Ingest;
+import us.yuxin.sa.transformer.JsonDecomposer;
+import us.yuxin.sa.transformer.Transformer;
+import us.yuxin.sa.transformer.TransformerFactory;
 
 
 public class CIngestMapper implements Mapper<LongWritable, Text, NullWritable, NullWritable> {
   JobConf job;
   protected boolean storeAttirbute;
+  JsonDecomposer decomposer;
 
   MutationBatch mb;
-  protected ObjectMapper mapper;
-  protected MessagePack messagePack;
 
-  protected DateTimeFormatter timeFmt;
-  protected AtomicInteger serial;
-  protected AtomicInteger oidSerial;
+  protected MessagePack messagePack;
 
   AstyanaxContext<Keyspace> context;
   Keyspace ks;
   ColumnFamily<String, String> cf;
 
+
   @Override
   public void configure(JobConf job) {
     this.job = job;
 
-    mapper = new ObjectMapper();
     messagePack = new MessagePack();
+    storeAttirbute = job.getBoolean(Ingest.CONF_INGEST_STORE_ATTR, false);
 
-    timeFmt = DateTimeFormat.forPattern("YYYYMMddHHmmssSSS");
-    oidSerial = new AtomicInteger(0);
-    serial = new AtomicInteger(0);
+    Transformer transformer = null;
+    try {
+      transformer = TransformerFactory.get((String) job.get(Ingest.CONF_INGEST_TRANSFORMER));
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
 
-    storeAttirbute = job.getBoolean(CIngest.CONF_INGEST_STORE_ATTR, false);
+    decomposer = new JsonDecomposer(transformer);
+    decomposer.start();
 
     Iterator<String> tokens = Splitter.on("///").split(job.get(CIngest.CONF_CASSANDRA_CONNECT_TOKEN)).iterator();
 
@@ -95,9 +97,8 @@ public class CIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
 
     byte[] raw = value.getBytes();
 
-
-    Map<String, Object> msg = mapper.readValue(raw, Map.class);
-    String rowId = createRowId(msg);
+    Map<String, Object> msg = decomposer.readValue(raw);
+    String rowId = new String(decomposer.getRowKey());
 
     // System.out.println("rowId:" + rowId.toString());
     if (rowId == null) {
@@ -108,6 +109,7 @@ public class CIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
     if (mb == null) {
       mb = ks.prepareMutationBatch();
     }
+
     ColumnListMutation<String> c = mb.withRow(cf, rowId);
     c.putColumn("raw", value.toString(), null);
 
@@ -150,42 +152,7 @@ public class CIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
         e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
       }
     }
+    decomposer.stop();
     context.shutdown();
-  }
-
-
-  protected String createRowId(Map<String, Object> data) {
-    Long ots = null;
-    Object ov;
-
-    ov = data.get("logTimestamp");
-    if (ov == null) {
-      //return new Text("9999");
-      return null;
-    }
-
-    if (ov instanceof Long) {
-      ots = (Long) ov;
-    } else if (ov instanceof Integer) {
-      // logger.warn("Invalid logTimestamp(int) - raw-log:" + new String(event.getBody()));
-      ots = ((Integer) ov).longValue();
-    } else if (ov instanceof String) {
-      // logger.warn("Invalid logTimestamp(string) - raw-log:" + new String(event.getBody()));
-      ots = Long.parseLong((String) ov);
-    }
-
-    if (ots == null) {
-      // logger.warn("Invalid logTimestamp(empty) - raw-log:" + new String(event.getBody()));
-      // return new Text("9999");
-      return null;
-    }
-
-    Integer oid = (Integer) data.get("oid");
-    if (oid == null)
-      oid = oidSerial.incrementAndGet();
-
-    Integer ser = serial.incrementAndGet();
-    return String.format("%s.%04d%04d",
-      timeFmt.print(ots), oid % 10000, ser % 10000);
   }
 }
