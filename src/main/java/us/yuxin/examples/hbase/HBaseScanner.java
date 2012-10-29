@@ -14,7 +14,7 @@ import org.apache.hadoop.hbase.client.Scan;
 public class HBaseScanner {
   public static void main(String [] args) throws IOException {
 
-    String connectToken = args[1];
+    String connectToken = args[0];
 
     Iterator<String> tokens = Splitter.on("///").split(connectToken).iterator();
 
@@ -37,9 +37,9 @@ public class HBaseScanner {
     Scan scan = new Scan();
     scan.setBatch(20);
     scan.setMaxVersions(1);
-    scan.setStartRow(args[2].getBytes());
-    scan.setStopRow(args[3].getBytes());
-    scan.addColumn("mp".getBytes(), null);
+    scan.setStartRow(args[1].getBytes());
+    scan.setStopRow(args[2].getBytes());
+    scan.addColumn("mp".getBytes(), new byte[0]);
 
     ResultScanner rs = hTable.getScanner(scan);
     int c = 0;
