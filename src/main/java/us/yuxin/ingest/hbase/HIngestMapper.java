@@ -123,7 +123,7 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
     try {
       Map<String, Object> msg = decomposer.readValue(raw);
 
-      byte[] rowId = decomposer.getKey();
+      byte[] rowId = decomposer.getBinaryKey();
       if (rowId == null) {
         // TODO ... Error Handler
         return;
