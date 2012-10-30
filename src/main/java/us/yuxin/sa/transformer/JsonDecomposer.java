@@ -40,6 +40,7 @@ public class JsonDecomposer {
     serial = new AtomicInteger(0);
     params = new HashMap<String, Object>();
 
+    keyBuffer = ByteBuffer.allocate(12);
   }
 
 
