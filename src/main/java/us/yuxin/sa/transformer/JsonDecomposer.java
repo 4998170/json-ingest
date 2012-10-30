@@ -114,10 +114,11 @@ public class JsonDecomposer {
       oid = oidSerial.incrementAndGet();
 
     Integer ser = serial.incrementAndGet();
+
     lastKey = String.format("%s.%04d%04d",
       timeFmt.print(ots), oid % 10000, ser % 10000).getBytes();
 
-    keyBuffer.reset();
+    keyBuffer.rewind();
     keyBuffer.putLong(ots);
     keyBuffer.putShort((short)(ser & 0xffff));
     keyBuffer.putShort((short)(oid & 0xffff));
