@@ -98,7 +98,7 @@ public class CIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
     byte[] raw = value.getBytes();
 
     Map<String, Object> msg = decomposer.readValue(raw);
-    String rowId = new String(decomposer.getRowKey());
+    String rowId = new String(decomposer.getKey());
 
     // System.out.println("rowId:" + rowId.toString());
     if (rowId == null) {

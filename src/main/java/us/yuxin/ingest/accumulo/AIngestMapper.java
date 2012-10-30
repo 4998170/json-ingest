@@ -123,7 +123,7 @@ public class AIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
       }
 
       Map<String, Object> msg = decomposer.readValue(raw);
-      Text rowId = new Text(decomposer.getRowKey());
+      Text rowId = new Text(decomposer.getKey());
 
       // System.out.println("rowId:" + rowId.toString());
       if (rowId == null) {

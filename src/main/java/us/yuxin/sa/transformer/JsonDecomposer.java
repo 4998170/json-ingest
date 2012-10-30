@@ -1,6 +1,7 @@
 package us.yuxin.sa.transformer;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,8 +21,9 @@ public class JsonDecomposer {
   Map<String, Object> params;
 
   Map<String, Object> lastValue;
-  byte[] lastRowKey;
-
+  byte[] lastKey;
+  byte[] lastBinaryKey;
+  ByteBuffer keyBuffer;
 
   public JsonDecomposer() {
     this(null);
@@ -37,6 +39,7 @@ public class JsonDecomposer {
     oidSerial = new AtomicInteger(0);
     serial = new AtomicInteger(0);
     params = new HashMap<String, Object>();
+
   }
 
 
@@ -46,7 +49,9 @@ public class JsonDecomposer {
 
 
   public Map<String, Object> readValue(byte[] text) throws IOException {
-    lastRowKey = null;
+    lastKey = null;
+    lastBinaryKey = null;
+
     lastValue = mapper.readValue(text, Map.class);
 
     if (lastValue != null) {
@@ -67,6 +72,12 @@ public class JsonDecomposer {
 
     return lastValue;
   }
+
+
+  private void createBinaryRowId() {
+
+  }
+
 
   private void createRowId() {
     if (lastValue == null) {
@@ -102,8 +113,15 @@ public class JsonDecomposer {
       oid = oidSerial.incrementAndGet();
 
     Integer ser = serial.incrementAndGet();
-    lastRowKey = String.format("%s.%04d%04d",
+    lastKey = String.format("%s.%04d%04d",
       timeFmt.print(ots), oid % 10000, ser % 10000).getBytes();
+
+    keyBuffer.reset();
+    keyBuffer.putLong(ots);
+    keyBuffer.putShort((short)(ser & 0xffff));
+    keyBuffer.putShort((short)(oid & 0xffff));
+
+    lastBinaryKey = keyBuffer.array();
   }
 
 
@@ -118,7 +136,13 @@ public class JsonDecomposer {
       transformer.stop();
   }
 
-  public byte[] getRowKey() {
-    return lastRowKey;
+
+  public byte[] getKey() {
+    return lastKey;
+  }
+
+
+  public byte[] getBinaryKey() {
+    return lastBinaryKey;
   }
 }
