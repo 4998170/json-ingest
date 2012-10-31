@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.codehaus.jackson.map.ObjectMapper;
@@ -11,6 +12,8 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
 public class JsonDecomposer {
+  public static final String CATEGORY_POSTFIX_KEY = "__cp";
+
   ObjectMapper mapper;
 
   protected DateTimeFormatter timeFmt;
@@ -19,11 +22,13 @@ public class JsonDecomposer {
 
   Transformer transformer;
   Map<String, Object> params;
-
   Map<String, Object> lastValue;
+
   byte[] lastKey;
   byte[] lastBinaryKey;
+
   ByteBuffer keyBuffer;
+  boolean categoryPostfix;
 
   public JsonDecomposer() {
     this(null);
@@ -40,7 +45,13 @@ public class JsonDecomposer {
     serial = new AtomicInteger(0);
     params = new HashMap<String, Object>();
 
-    keyBuffer = ByteBuffer.allocate(12);
+    categoryPostfix = true;
+
+    if (categoryPostfix) {
+      keyBuffer = ByteBuffer.allocate(12);
+    } else {
+      keyBuffer = ByteBuffer.allocate(16);
+    }
   }
 
 
@@ -72,11 +83,6 @@ public class JsonDecomposer {
     }
 
     return lastValue;
-  }
-
-
-  private void createBinaryRowId() {
-
   }
 
 
@@ -115,15 +121,39 @@ public class JsonDecomposer {
 
     Integer ser = serial.incrementAndGet();
 
-    lastKey = String.format("%s.%04d%04d",
-      timeFmt.print(ots), oid % 10000, ser % 10000).getBytes();
-
     keyBuffer.rewind();
     keyBuffer.putLong(ots);
     keyBuffer.putShort((short)(ser & 0xffff));
     keyBuffer.putShort((short)(oid & 0xffff));
 
+    String cp = null;
+    if (categoryPostfix) {
+      cp = (String)lastValue.get(CATEGORY_POSTFIX_KEY);
+      if (cp == null) {
+        cp = (String)params.get(CATEGORY_POSTFIX_KEY);
+      }
+
+      if (cp == null) {
+        cp = "____";
+      }
+
+      // TODO fill short category postfix to least 4 byte
+      lastKey = String.format("%s.%04d%04d%-4.4s",
+        timeFmt.print(ots), oid % 10000, ser % 10000, cp).getBytes();
+      keyBuffer.put(cp.getBytes(), 0, 4);
+    } else {
+      lastKey = String.format("%s.%04d%04d",
+        timeFmt.print(ots), oid % 10000, ser % 10000).getBytes();
+    }
     lastBinaryKey = keyBuffer.array();
+  }
+
+
+  public void start(Properties conf) {
+    if (transformer != null) {
+      transformer.setup(conf);
+    }
+    start();
   }
 
 
