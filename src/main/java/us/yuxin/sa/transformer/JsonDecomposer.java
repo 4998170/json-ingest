@@ -48,9 +48,9 @@ public class JsonDecomposer {
     categoryPostfix = true;
 
     if (categoryPostfix) {
-      keyBuffer = ByteBuffer.allocate(12);
-    } else {
       keyBuffer = ByteBuffer.allocate(16);
+    } else {
+      keyBuffer = ByteBuffer.allocate(12);
     }
   }
 
