@@ -123,8 +123,8 @@ public class JsonDecomposer {
 
     keyBuffer.rewind();
     keyBuffer.putLong(ots);
-    keyBuffer.putShort((short)(ser & 0xffff));
     keyBuffer.putShort((short)(oid & 0xffff));
+    keyBuffer.putShort((short)(ser & 0xffff));
 
     String cp = null;
     if (categoryPostfix) {
