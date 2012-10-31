@@ -160,7 +160,7 @@ public class HIngestMapper implements Mapper<LongWritable, Text, NullWritable, N
           if (v.equals(""))
             continue;
 
-          put.add("a".getBytes(), k.toLowerCase().getBytes(), v.toString().getBytes());
+          put.add("a".getBytes(), k.toLowerCase().getBytes(), v.toString().getBytes("utf-8"));
         }
         hTable.put(put);
       }
