@@ -15,6 +15,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Date;
@@ -301,12 +302,27 @@ public class H2Loader {
     loader.setup(conf);
     if (conf.getProperty("createtable", "false").toLowerCase().equals("true")) {
       loader.createTable();
+    } else {
+      loader.readColumns();
     }
 
     loader.addJsonDir(
       conf.getProperty("path", "datas"),
       conf.getProperty("glob", "*"));
     loader.close();
+  }
+
+  private void readColumns() throws SQLException {
+    Statement stmt = connection.createStatement();
+
+    stmt.execute("select COLUMN_name  from information_schema.columns where table_name = '" + tableName.toUpperCase() + "'");
+    ResultSet res = stmt.getResultSet();
+
+    while (res.next()) {
+      columns.add(res.getString(0));
+    }
+    res.close();
+    stmt.close();
   }
 
 
