@@ -112,13 +112,14 @@ public class H2Loader {
 
 
   private void addJsonData(List<Entry> cloneData) throws SQLException {
+    for (Entry e: cloneData) {
+      pStmt.setObject(fieldOrder.get(e.key), e.value);
+    }
+
     for (int i = 1; i <= columns.size(); ++i) {
       pStmt.setNull(i, Types.VARCHAR);
     }
 
-    for (Entry e: cloneData) {
-      pStmt.setObject(fieldOrder.get(e.key), e.value);
-    }
     pStmt.addBatch();
     queueSize += 1;
 
