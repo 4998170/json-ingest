@@ -319,7 +319,7 @@ public class H2Loader {
     ResultSet res = stmt.getResultSet();
 
     while (res.next()) {
-      columns.add(res.getString(0).toLowerCase());
+      columns.add(res.getString(1).toLowerCase());
     }
     res.close();
     stmt.close();
