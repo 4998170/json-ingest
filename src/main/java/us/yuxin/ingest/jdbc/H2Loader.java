@@ -272,7 +272,7 @@ public class H2Loader {
 
     Class.forName(conf.getProperty("jdbc.driver", "org.h2.Driver"));
     setTableName(conf.getProperty("jdbc.tablename", "sa"));
-    open(conf.getProperty("jdbc.url", "jdbc:h2://localhost/mem:sa"),
+    open(conf.getProperty("jdbc.url", "jdbc:h2:tcp://localhost/mem:sa"),
       conf.getProperty("jdbc.username", "sa"),
       conf.getProperty("jdbc.password", ""));
 
@@ -299,7 +299,10 @@ public class H2Loader {
 
     H2Loader loader = new H2Loader();
     loader.setup(conf);
-    loader.createTable();
+    if (conf.getProperty("createtable").toLowerCase().equals("true")) {
+      loader.createTable();
+    }
+
     loader.addJsonDir(
       conf.getProperty("path", "datas"),
       conf.getProperty("glob", "*"));
