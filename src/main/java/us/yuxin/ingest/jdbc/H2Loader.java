@@ -94,6 +94,7 @@ public class H2Loader {
         continue;
 
       Entry entry = new Entry(e);
+      cloneData.add(entry);
       if (!columns.contains(entry.key)) {
         addFields.add(entry.key);
       }
