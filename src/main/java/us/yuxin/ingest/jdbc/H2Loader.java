@@ -50,6 +50,7 @@ public class H2Loader {
   protected List<String> addFields = new LinkedList<String>();
   protected List<Entry> cloneData = new LinkedList<Entry>();
   protected Map<String, Integer> fieldOrder = new HashMap<String, Integer>();
+  protected Object[] values;
   protected String insertQueryString;
 
   private static final int INSERT_BATCH_SIZE = 2000;
@@ -112,12 +113,16 @@ public class H2Loader {
 
 
   private void addJsonData(List<Entry> cloneData) throws SQLException {
+    for (int i = 1; i <= columns.size(); ++i) {
+      values[i] = null;
+    }
+
     for (Entry e: cloneData) {
-      pStmt.setObject(fieldOrder.get(e.key), e.value);
+      values[fieldOrder.get(e.key)] = e.value;
     }
 
     for (int i = 1; i <= columns.size(); ++i) {
-      pStmt.setNull(i, Types.VARCHAR);
+      pStmt.setObject(i, values[i]);
     }
 
     pStmt.addBatch();
@@ -164,6 +169,7 @@ public class H2Loader {
     query += ")";
 
     insertQueryString = query;
+    values = new Object[columns.size() + 1];
     renewPreparedStatement();
   }
 
