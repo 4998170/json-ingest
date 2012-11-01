@@ -19,6 +19,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -111,6 +112,10 @@ public class H2Loader {
 
 
   private void addJsonData(List<Entry> cloneData) throws SQLException {
+    for (int i = 1; i <= columns.size(); ++i) {
+      pStmt.setNull(i, Types.VARCHAR);
+    }
+
     for (Entry e: cloneData) {
       pStmt.setObject(fieldOrder.get(e.key), e.value);
     }
