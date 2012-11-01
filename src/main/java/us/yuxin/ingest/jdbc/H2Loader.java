@@ -233,6 +233,8 @@ public class H2Loader {
 
 
   public void addJsonFile(File path) throws IOException, SQLException {
+    String spath = path.getName();
+
     connection.setAutoCommit(false);
     System.out.println("reading " + path + " ...");
     int count = 0;
@@ -248,6 +250,7 @@ public class H2Loader {
         continue;
 
       Map<String, Object> map = decomposer.readValue(line.getBytes("utf8"));
+      map.put("spath", spath);
       addJsonData(map);
       count++;
 
@@ -256,7 +259,7 @@ public class H2Loader {
       }
     }
 
-    flush();
+    flushQueue();
     System.out.println("" + count + " ... " + new Date().toString());
     reader.close();
   }
