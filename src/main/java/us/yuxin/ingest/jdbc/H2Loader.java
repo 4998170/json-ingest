@@ -46,6 +46,7 @@ public class H2Loader {
     if (inserts.size() == 0 && appendColumns.size() == 0)
       return;
 
+
     Statement stmt = connection.createStatement();
     for (String query : appendColumns) {
       stmt.addBatch(query);
@@ -145,7 +146,7 @@ public class H2Loader {
       addJsonDataBatch(map);
       count++;
 
-      if (count % 2500 == 0) {
+      if (count % 10000 == 0) {
         executeBatchFlush();
       }
 
