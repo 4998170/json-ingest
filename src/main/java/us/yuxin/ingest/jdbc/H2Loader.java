@@ -19,6 +19,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -272,6 +273,7 @@ public class H2Loader {
     finder.done();
 
     List<Path> paths = finder.getPahts();
+    Collections.sort(paths);
 
     for (Path path: paths) {
       File file = path.toFile();
