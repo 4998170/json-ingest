@@ -299,7 +299,7 @@ public class H2Loader {
 
     H2Loader loader = new H2Loader();
     loader.setup(conf);
-    if (conf.getProperty("createtable").toLowerCase().equals("true")) {
+    if (conf.getProperty("createtable", "false").toLowerCase().equals("true")) {
       loader.createTable();
     }
 
