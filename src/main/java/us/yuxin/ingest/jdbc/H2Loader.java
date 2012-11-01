@@ -19,7 +19,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Types;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -53,7 +52,7 @@ public class H2Loader {
   protected Object[] values;
   protected String insertQueryString;
 
-  private static final int INSERT_BATCH_SIZE = 2000;
+  private static final int INSERT_BATCH_SIZE = 5000;
 
 
   public static class Entry {
