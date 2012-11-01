@@ -15,10 +15,12 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -41,11 +43,32 @@ public class H2Loader {
   protected Properties conf;
 
 
-  public void executeBatchFlush() throws SQLException {
+  protected PreparedStatement pStmt = null;
+  protected int queueSize = 0;
 
+  protected List<String> addFields = new LinkedList<String>();
+  protected List<Entry> cloneData = new LinkedList<Entry>();
+  protected Map<String, Integer> fieldOrder = new HashMap<String, Integer>();
+  protected String insertQueryString;
+
+  private static final int INSERT_BATCH_SIZE = 2000;
+
+
+  public static class Entry {
+    public String key;
+    public Object value;
+
+    public Entry(Map.Entry<String, Object> e) {
+      key = e.getKey().toLowerCase();
+      value = e.getValue();
+    }
+  }
+
+
+
+  public void flush() throws SQLException {
     if (inserts.size() == 0 && appendColumns.size() == 0)
       return;
-
 
     Statement stmt = connection.createStatement();
     for (String query : appendColumns) {
@@ -60,15 +83,91 @@ public class H2Loader {
 
     appendColumns.clear();
     inserts.clear();
+  }
 
+
+  public void addJsonData(Map<String, Object> data) throws SQLException {
+    for (Map.Entry<String, Object> e: data.entrySet()) {
+      if (e.getKey().startsWith("__"))
+        continue;
+
+      Entry entry = new Entry(e);
+      if (!columns.contains(entry.key)) {
+        addFields.add(entry.key);
+      }
+    }
+
+    if (!addFields.isEmpty()) {
+      flushQueue();
+      for (String s: addFields) {
+        addColumn(s);
+      }
+      addFields.clear();
+      rebuildPreparedStatement();
+    }
+    addJsonData(cloneData);
+    cloneData.clear();
+  }
+
+
+  private void addJsonData(List<Entry> cloneData) throws SQLException {
+    for (Entry e: cloneData) {
+      pStmt.setObject(fieldOrder.get(e.key), e.value);
+    }
+    pStmt.addBatch();
+    queueSize += 1;
+
+    if (queueSize > INSERT_BATCH_SIZE) {
+      flushQueue();
+    }
+  }
+
+
+  private void flushQueue() throws SQLException {
+    if (queueSize > 0) {
+      pStmt.executeBatch();
+      pStmt.close();
+      connection.commit();
+      queueSize = 0;
+      renewPreparedStatement();
+    }
+  }
+
+  private void rebuildPreparedStatement() throws SQLException {
+    String query = "INSERT INTO " + tableName + "(";
+
+    boolean first = true;
+    fieldOrder.clear();
+
+    int order = 0;
+    for (String c: columns) {
+      if (first) {
+        first = false;
+      } else {
+        query += ",";
+      }
+      query += c;
+      order += 1;
+      fieldOrder.put(c, order);
+    }
+
+    query += ") VALUES (?";
+    for (int i = 0; i < columns.size() - 1; ++i) {
+      query += ",?";
+    }
+    query += ")";
+
+    insertQueryString = query;
+    renewPreparedStatement();
+  }
+
+
+  private void renewPreparedStatement() throws SQLException {
+    pStmt = connection.prepareStatement(insertQueryString);
   }
 
 
   public void createTable() throws SQLException {
-    // Connection co = connection;
-    // Statement stmt = co.createStatement();
-    // stmt.execute("DROP TABLE IF EXISTS " + tableName);
-
     String dstmt = "DROP TABLE IF EXISTS " + tableName;
     String cstmt = "CREATE MEMORY TABLE " + tableName +
       " (id INT AUTO_INCREMENT PRIMARY KEY";
@@ -101,9 +200,11 @@ public class H2Loader {
     return res;
   }
 
+
   public void open(String url, String username, String password) throws ClassNotFoundException, SQLException {
     connection = DriverManager.getConnection(url, username, password);
   }
+
 
   public void close() throws SQLException {
     if (connection != null) {
@@ -116,14 +217,6 @@ public class H2Loader {
 
   public void setTableName(String name) {
     this.tableName = name;
-  }
-
-
-  public void setBaseColumns(String columns[]) {
-    this.columns = new HashSet<>();
-    for (String c : columns) {
-      this.columns.add(c);
-    }
   }
 
 
@@ -143,22 +236,19 @@ public class H2Loader {
         continue;
 
       Map<String, Object> map = decomposer.readValue(line.getBytes("utf8"));
-      addJsonDataBatch(map);
+      addJsonData(map);
       count++;
-
-      if (count % 10000 == 0) {
-        executeBatchFlush();
-      }
 
       if (count % 10000 == 0) {
         System.out.println("" + count + " ... " + new Date().toString());
       }
     }
 
-    executeBatchFlush();
+    flush();
     System.out.println("" + count + " ... " + new Date().toString());
     reader.close();
   }
+
 
   public void addJsonDir(String basePath, String globPattern) throws IOException, SQLException {
     Finder finder = new Finder(globPattern);
@@ -176,48 +266,6 @@ public class H2Loader {
     }
   }
 
-  public void addJsonData(Map<String, Object> map) throws SQLException {
-    StringBuilder keyStr = new StringBuilder();
-    StringBuilder valStr = new StringBuilder();
-
-    boolean first = true;
-
-    for (Map.Entry<String, Object> e : map.entrySet()) {
-      String key = e.getKey();
-      Object val = e.getValue();
-
-      if (val == null)
-        continue;
-      if (val instanceof String && ((String) val).length() == 0)
-        continue;
-
-      if (key.startsWith("__")) {
-        continue;
-      }
-
-      if (!first) {
-        keyStr.append(",");
-        valStr.append(",");
-      } else {
-        keyStr.append("INSERT INTO " + tableName + " (");
-        valStr.append(") VALUES (");
-        first = false;
-      }
-
-      key = key.toLowerCase();
-
-      if (!columns.contains(key)) {
-        addColumn(key);
-      }
-
-      keyStr.append(e.getKey());
-      String vals = val.toString().replace("'", "''");
-      valStr.append("'").append(vals).append("'");
-    }
-
-    keyStr.append(valStr).append(")");
-    execute(keyStr.toString());
-  }
 
   public void addJsonDataBatch(Map<String, Object> map) throws SQLException {
     StringBuilder keyStr = new StringBuilder();
